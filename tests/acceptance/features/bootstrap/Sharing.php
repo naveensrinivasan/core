@@ -1658,6 +1658,7 @@ trait Sharing {
 			$group,
 			$permissions
 		);
+		$this->pushToLastStatusCodesArrays();
 	}
 
 	/**
@@ -1915,6 +1916,34 @@ trait Sharing {
 		}
 		$language = TranslationHelper::getLanguage($language);
 		$this->getShareData($user, (string)$share_id, $language);
+		$this->pushToLastStatusCodesArrays();
+	}
+
+	/**
+	 * @Then the info about the last share by user :sharer with user :sharee should include
+	 *
+	 * @param string $sharer
+	 * @param string $sharee
+	 * @param TableNode $table
+	 *
+	 * @return void
+	 * @throws Exception
+	 */
+	public function theInfoAboutTheLastShareByUserWithUserShouldInclude($sharer, $sharee, TableNode $table):void {
+		$this->userGetsInfoOfLastShareUsingTheSharingApi($sharer);
+		$rows = $table->getRows();
+		$infoTable = [];
+		for ($index = 0; $index < \count($rows); $index++) {
+			if ($rows[$index][0] === "ocs_status_code") {
+				$this->ocsContext->theOCSStatusCodeShouldBe($rows[$index][1]);
+			} elseif ($rows[$index][0] === "http_status_code") {
+				$this->thenTheHTTPStatusCodeShouldBe($rows[$index][1]);
+			} else {
+				$infoTable[$index] = $rows[$index];
+			}
+		}
+		$table = new TableNode($infoTable);
+		$this->checkFieldsOfLastResponseToUser($sharer, $sharee, $table);
 	}
 
 	/**
