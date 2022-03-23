@@ -1920,16 +1920,19 @@ trait Sharing {
 	}
 
 	/**
-	 * @Then the info about the last share by user :sharer with user :sharee should include
+	 * @Then /^the info about the last share by user "([^"]*)" with (user|group) "([^"]*)" should include$/
 	 *
 	 * @param string $sharer
+	 * @param string $userOrGroup
 	 * @param string $sharee
 	 * @param TableNode $table
 	 *
 	 * @return void
 	 * @throws Exception
 	 */
-	public function theInfoAboutTheLastShareByUserWithUserShouldInclude($sharer, $sharee, TableNode $table):void {
+	public function theInfoAboutTheLastShareByUserWithUserShouldInclude(
+		string $sharer, string $userOrGroup, string $sharee, TableNode $table
+	):void {
 		$this->userGetsInfoOfLastShareUsingTheSharingApi($sharer);
 		$rows = $table->getRows();
 		$infoTable = [];
@@ -3124,6 +3127,22 @@ trait Sharing {
 			200,
 			__METHOD__ . " could not accept the pending share $share to $user by $offeredBy"
 		);
+	}
+
+	/**
+	 * @Then /^user "([^"]*)" should be able to accept pending share "([^"]*)" offered by user "([^"]*)"$/
+	 *
+	 * @param string $user
+	 * @param string $share
+	 * @param string $offeredBy
+	 *
+	 * @return void
+	 * @throws Exception
+	 */
+	public function userShouldBeAbleToAcceptShareOfferedBy(
+		string $user, string $share, string $offeredBy
+	){
+		$this->userHasAcceptedThePendingShareOfferedBy($user, $share, $offeredBy);
 	}
 
 	/**
