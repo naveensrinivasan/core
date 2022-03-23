@@ -7,6 +7,7 @@ OC_CI_BAZEL_BUILDIFIER = "owncloudci/bazel-buildifier"
 OC_CI_CEPH = "owncloudci/ceph:tag-build-master-jewel-ubuntu-16.04"
 OC_CI_CORE_NODEJS = "owncloudci/core:nodejs14"
 OC_CI_DRONE_CANCEL_PREVIOUS_BUILDS = "owncloudci/drone-cancel-previous-builds"
+OC_CI_DRONE_SKIP_PIPELINE = "owncloudci/drone-skip-pipeline"
 OC_CI_NODEJS = "owncloudci/nodejs:14"
 OC_CI_ORACLE_XE = "owncloudci/oracle-xe:latest"
 OC_CI_PHP = "owncloudci/php:%s"
@@ -1216,7 +1217,7 @@ def javascript(ctx, withCoverage):
             "base": dir["base"],
             "path": "src",
         },
-        "steps": cacheRestore() +
+        "steps": skipIfUnchanged(ctx, "unit-tests") + cacheRestore() +
                  yarnInstall() +
                  [
                      {
@@ -1439,7 +1440,8 @@ def phpTests(ctx, testType, withCoverage):
                             "base": dir["base"],
                             "path": "src",
                         },
-                        "steps": cacheRestore() +
+                        "steps": skipIfUnchanged(ctx, "unit-tests") +
+                                 cacheRestore() +
                                  composerInstall(phpVersion) +
                                  installServer(phpVersion, db, params["logLevel"]) +
                                  installExtraApps(phpVersion, extraAppsDict, dir["server"]) +
@@ -1760,7 +1762,8 @@ def acceptance(ctx):
                                         "base": dir["base"],
                                         "path": "src",
                                     },
-                                    "steps": cacheRestore() +
+                                    "steps": skipIfUnchanged(ctx, "acceptance-tests") +
+                                             cacheRestore() +
                                              composerInstall(phpVersion) +
                                              vendorbinBehat() +
                                              yarnInstall() +
@@ -2621,8 +2624,7 @@ def installServer(phpVersion, db, logLevel = "2", ssl = False, federatedServerNe
 def enableAppsForPhpStan(phpVersion):
     return [{
         "name": "enable-apps-for-phpstan",
-        "image": "owncloudci/php:%s" % phpVersion,
-        "pull": "always",
+        "image": OC_CI_PHP % phpVersion,
         "commands": [
             # files_external can be disabled.
             # We need it to be enabled so that the PHP static analyser can find classes in it.
@@ -2990,3 +2992,113 @@ def checkStarlark():
             ],
         },
     }]
+
+def skipIfUnchanged(ctx, type):
+    if ("full-ci" in ctx.build.title.lower()):
+        return []
+
+    skip_step = {
+        "name": "skip-if-unchanged",
+        "image": OC_CI_DRONE_SKIP_PIPELINE,
+        "when": {
+            "event": [
+                "pull_request",
+            ],
+        },
+    }
+
+    # these files are not relevant for test pipelines
+    # if only files in this array are changed, then don't even run the "lint"
+    # pipelines (like code-style, phan, phpstan...)
+    allow_skip_if_changed = [
+        "^.github/.*",
+        "^changelog/.*",
+        "CHANGELOG.md",
+        "CONTRIBUTING.md",
+        "LICENSE",
+        "LICENSE.md",
+        "README.md",
+    ]
+
+    if type == "lint":
+        skip_step["settings"] = {
+            "ALLOW_SKIP_CHANGED": allow_skip_if_changed,
+        }
+        return [skip_step]
+
+    if type == "acceptance-tests":
+        # if any of these files are touched then run all acceptance tests
+        # note: some oC10 apps have various directories like handlers, rules, etc.
+        #       so those are all listed here so that this starlark code can be
+        #       the same for every oC10 app.
+        acceptance_files = [
+            "^tests/acceptance/.*",
+            "^tests/drone/.*",
+            "^tests/data/.*",
+            "^tests/TestHelpers/.*",
+            "^tests/enable_all.php",
+            "^tests/preseed-config.php",
+            "^vendor-bin/behat/.*",
+            "^core/.*",
+            "^lib/.*",
+            "^l10n/.*",
+            "^ocm-provider/.*",
+            "^ocs/.*",
+            "^ocs-provider/.*",
+            "^resources/.*",
+            "^settings/.*",
+            "composer.json",
+            "composer.lock",
+            "Makefile",
+            "package.json",
+            "package-lock.json",
+            "yarn.lock",
+        ]
+        skip_step["settings"] = {
+            "DISALLOW_SKIP_CHANGED": acceptance_files,
+        }
+        return [skip_step]
+
+    if type == "unit-tests":
+        # if any of these files are touched then run all unit tests
+        # note: some oC10 apps have various directories like handlers, rules, etc.
+        #       so those are all listed here so that this starlark code can be
+        #       the same for every oC10 app.
+        unit_files = [
+            "^tests/apps/.*",
+            "^tests/core/.*",
+            "^tests/data/.*",
+            "^tests/docs/.*",
+            "^tests/lib/.*",
+            "^tests/Settings/.*",
+            "^tests/TestHelpers/.*",
+            "^tests/apps.php",
+            "^tests/bootstrap.php",
+            "^tests/enable_all.php",
+            "^tests/phpunit-autotest.xml",
+            "^tests/phpunit-autotest-external.xml",
+            "^tests/preseed-config.php",
+            "^tests/startsessionlistener.php",
+            "^core/.*",
+            "^lib/.*",
+            "^l10n/.*",
+            "^ocm-provider/.*",
+            "^ocs/.*",
+            "^ocs-provider/.*",
+            "^resources/.*",
+            "^settings/.*",
+            "composer.json",
+            "composer.lock",
+            "Makefile",
+            "package.json",
+            "package-lock.json",
+            "phpunit.xml",
+            "yarn.lock",
+            "sonar-project.properties",
+        ]
+        skip_step["settings"] = {
+            "DISALLOW_SKIP_CHANGED": unit_files,
+        }
+        return [skip_step]
+
+    return []
