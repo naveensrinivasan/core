@@ -115,16 +115,15 @@ Feature: a default expiration date can be specified for shares with users or gro
       | shareType   | user       |
       | shareWith   | Brian      |
       | permissions | read,share |
-    And parameter "shareapi_default_expire_date_user_share" of app "core" has been set to "no"
-    When user "Alice" gets the info of the last share using the sharing API
-    Then the OCS status code should be "<ocs_status_code>"
-    And the HTTP status code should be "<http_status_code>"
-    And the fields of the last response to user "Alice" sharing with user "Brian" should include
-      | share_type  | user       |
-      | file_target | /FOLDER    |
-      | uid_owner   | %username% |
-      | share_with  | %username% |
-      | expiration  | +7 days    |
+    When parameter "shareapi_default_expire_date_user_share" of app "core" has been set to "no"
+    Then the info about the last share by user "Alice" with user "Brian" should include
+      | share_type       | user               |
+      | file_target      | /FOLDER            |
+      | uid_owner        | %username%         |
+      | share_with       | %username%         |
+      | expiration       | +7 days           |
+      | ocs_status_code  | <ocs_status_code>  |
+      | http_status_code | <http_status_code> |
     And the response when user "Brian" gets the info of the last share should include
       | expiration | +7 days |
     Examples:
